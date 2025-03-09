@@ -47,18 +47,37 @@ class AudioDataset(Dataset):
         # 加载音频文件
         waveform, sample_rate = torchaudio.load(self.audio_files[idx])
         
-        # 如果采样率不是目标采样率，进行重采样
+        # 重采样到16kHz
         if sample_rate != self.target_sample_rate:
-            resampler = torchaudio.transforms.Resample(
-                orig_freq=sample_rate,
-                new_freq=self.target_sample_rate
-            )
+            resampler = torchaudio.transforms.Resample(sample_rate, self.target_sample_rate)
             waveform = resampler(waveform)
-            
-        # 对音频数据进行标准化处理
+        
+        # 标准化处理
         mean = torch.mean(waveform)
         std = torch.std(waveform)
         waveform = (waveform - mean) / (std + 1e-6)  # 添加小值避免除零
+        
+        # 数据增强
+        # 1. 随机噪声 (降低概率和噪声强度)
+        if torch.rand(1) > 0.7:  # 将概率从0.5降低到0.3
+            noise = torch.randn_like(waveform) * 0.003  # 将噪声强度从0.005降低到0.003
+            waveform = waveform + noise
+        
+        # 2. 随机裁剪2秒片段
+        target_length = int(2 * self.target_sample_rate)  # 2秒对应的采样点数
+        if waveform.shape[1] > target_length:
+            max_start = waveform.shape[1] - target_length
+            start = torch.randint(0, max_start, (1,))
+            waveform = waveform[:, start:start+target_length]
+        else:
+            # 如果音频长度不足2秒，则进行填充
+            padding = target_length - waveform.shape[1]
+            waveform = torch.nn.functional.pad(waveform, (0, padding))
+        
+        # 3. 随机增益变化 (缩小增益变化范围)
+        if torch.rand(1) > 0.7:  # 将概率从0.5降低到0.3
+            gain = 0.9 + 0.2 * torch.rand(1)  # 将增益范围从[0.8, 1.2]缩小到[0.9, 1.1]
+            waveform = waveform * gain
         
         # 获取对应的标签
         label = self.labels[idx]

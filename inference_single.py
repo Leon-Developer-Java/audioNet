@@ -4,7 +4,7 @@ import torchaudio
 import torch.nn.functional as F
 from basic_processor import BasicProcessor
 from dataset import AudioDataset
-from model_full import AemNet
+from model_residual import AemNetResidual as AemNet
 from audio_augmentation import AugmentationProcessor
 from shape_processor import ShapeProcessor
 
