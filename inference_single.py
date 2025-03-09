@@ -4,7 +4,7 @@ import torchaudio
 import torch.nn.functional as F
 from basic_processor import BasicProcessor
 from dataset import AudioDataset
-from model_residual import AemNetResidual as AemNet
+from model_full import AemNet
 from audio_augmentation import AugmentationProcessor
 from shape_processor import ShapeProcessor
 
@@ -29,9 +29,9 @@ def inference_single(model_path, audio_file, only_shape=False):
     with torch.no_grad():
         # 模型推理
         outputs = model(waveform)
-        probabilities = F.softmax(outputs, dim=1)
-        prediction = torch.argmax(outputs, dim=1)
-        confidence, _ = torch.max(probabilities, dim=1)
+        probabilities = F.softmax(outputs, dim=0)
+        prediction = torch.argmax(outputs, dim=0)
+        confidence, _ = torch.max(probabilities, dim=0)
         
         # 获取结果
         pred_class = prediction.item()

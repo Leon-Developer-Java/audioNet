@@ -65,9 +65,9 @@ def inference(model_path, test_data_dir):
             
             # 模型推理
             output = model(waveform)
-            probabilities = F.softmax(output, dim=1)
-            prediction = torch.argmax(output, dim=1)
-            confidence = torch.max(probabilities, dim=1)[0]
+            probabilities = F.softmax(output, dim=0)
+            prediction = torch.argmax(output, dim=0)
+            confidence = torch.max(probabilities, dim=0)[0]
             
             # 收集结果
             all_predictions.append(prediction.item())
@@ -90,8 +90,8 @@ def inference(model_path, test_data_dir):
 
 if __name__ == '__main__':
     # 设置模型路径和测试数据目录
-    model_path = 'best_pth/ESC-51/full_basic_8.2random/best_model_epoch94_77.45.pth'
-    test_data_dir = 'audioSet/audio_data'
+    model_path = 'best_pth/ESC-51/full_basic_8.2random/best_model_epoch78_75.pth'
+    test_data_dir = 'audioSet/test_data'
     
     # 运行推理并生成混淆矩阵
     inference(model_path, test_data_dir)

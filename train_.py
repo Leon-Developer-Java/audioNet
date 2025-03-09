@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split, SubsetRandomSampler
 from dataloader import AudioDataset
 import pandas as pd
-from model_residual import AemNetResidual as AemNet
+from model_full import AemNet
 from tqdm import tqdm
 import multiprocessing
 from visualization import plot_training_history, plot_learning_rate
