@@ -1,51 +1,97 @@
 import os
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+import numpy as np
+import matplotlib.pyplot as plt
+import json
+from sklearn.metrics import confusion_matrix
 from dataset import AudioDataset
 from model_residual import AemNetResidual as AemNet
 
-def inference(model_path, test_data_dir, batch_size=32):
+def plot_confusion_matrix(y_true, y_pred, classes, save_path='confusion_matrix.png'):
+    # 计算混淆矩阵
+    cm = confusion_matrix(y_true, y_pred)
+    
+    # 创建图形
+    plt.figure(figsize=(15, 15))
+    plt.imshow(cm, interpolation='nearest', cmap='Blues')
+    plt.title('混淆矩阵')
+    plt.colorbar()
+    
+    # 设置坐标轴
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45, ha='right')
+    plt.yticks(tick_marks, classes)
+    
+    # 添加数值标签
+    thresh = cm.max() / 2.
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            plt.text(j, i, format(cm[i, j], 'd'),
+                     horizontalalignment='center',
+                     color='white' if cm[i, j] > thresh else 'black')
+    
+    plt.ylabel('真实标签')
+    plt.xlabel('预测标签')
+    plt.tight_layout()
+    
+    # 保存图形
+    plt.savefig(save_path)
+    plt.close()
+
+def inference(model_path, test_data_dir):
+    # 加载标签映射
+    with open('label_map.json', 'r') as f:
+        label_map = json.load(f)
+    
     # 加载预训练模型
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = AemNet(num_classes=51).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
     
-    # 创建测试数据集和数据加载器
+    # 创建测试数据集
     test_dataset = AudioDataset(test_data_dir)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    
+    # 用于收集预测结果
+    all_predictions = []
+    all_labels = []
     
     with torch.no_grad():
-        for batch_idx, (waveforms, _) in enumerate(test_loader):
-            # 将数据移到设备上
-            waveforms = waveforms.to(device)
+        for idx in range(len(test_dataset)):
+            # 获取单个样本
+            waveform, label = test_dataset[idx]
+            waveform = waveform.unsqueeze(0).to(device)
             
             # 模型推理
-            outputs = model(waveforms)
-            probabilities = F.softmax(outputs, dim=1)
-            predictions = torch.argmax(outputs, dim=1)
-            confidences, _ = torch.max(probabilities, dim=1)
+            output = model(waveform)
+            probabilities = F.softmax(output, dim=1)
+            prediction = torch.argmax(output, dim=1)
+            confidence = torch.max(probabilities, dim=1)[0]
+            
+            # 收集结果
+            all_predictions.append(prediction.item())
+            all_labels.append(label)
             
             # 打印结果
-            for i in range(waveforms.size(0)):
-                idx = batch_idx * batch_size + i
-                if idx >= len(test_dataset):
-                    break
-                    
-                filename = os.path.basename(test_dataset.audio_files[idx])
-                pred_class = predictions[i].item()
-                confidence = confidences[i].item()
-                
-                print(f'文件名: {filename}')
-                print(f'预测类别: {pred_class}')
-                print(f'置信度: {confidence:.4f}')
-                print('-' * 50)
+            filename = os.path.basename(test_dataset.audio_files[idx])
+            pred_class = label_map[str(prediction.item())]
+            true_class = label_map[str(label)]
+            print(f'Filename: {filename}')
+            print(f'Predicted Class: {pred_class}')
+            print(f'True Class: {true_class}')
+            print(f'Confidence: {confidence.item():.4f}')
+            print('-' * 50)
+    
+    # 生成混淆矩阵
+    unique_labels = sorted(set(test_dataset.label_names))
+    class_names = [label_map[str(i)] for i in range(len(unique_labels))]
+    plot_confusion_matrix(all_labels, all_predictions, class_names)
 
 if __name__ == '__main__':
     # 设置模型路径和测试数据目录
-    model_path = 'best_pth/ESC-51/2v1_3s/best_model_epoch188_avg95.88.pth'
+    model_path = 'best_pth/ESC-51/full_basic_8.2random/best_model_epoch94_77.45.pth'
     test_data_dir = 'audioSet/audio_data'
     
-    # 运行推理
+    # 运行推理并生成混淆矩阵
     inference(model_path, test_data_dir)
